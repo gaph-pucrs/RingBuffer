@@ -28,6 +28,7 @@ module RingBuffer
     logic [(DATA_SIZE - 1):0]           buffer [(BUFFER_SIZE - 1):0];
 
     assign rx_ack_o = !full;
+    assign tx_o     = !empty;
     assign data_o   = buffer[tail];
 
     assign next_head = head + 1'b1;
