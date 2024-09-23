@@ -56,9 +56,10 @@ module RingBuffer
 
     /* Buffer write control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (rst_ni)
-            if (can_receive)
-                buffer[head] <= data_i;
+        if (!rst_ni)
+            ;
+        else if (can_receive)
+            buffer[head] <= data_i;
     end
 
     /* Head control */
