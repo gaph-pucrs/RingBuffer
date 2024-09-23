@@ -19,6 +19,7 @@ module RingBuffer
 (
     input  logic                     clk_i,
     input  logic                     rst_ni,
+    input  logic                     buf_rst_i,
 
     input  logic                     rx_i,
     output logic                     rx_ack_o,
@@ -62,7 +63,7 @@ module RingBuffer
 
     /* Head control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni)
+        if (!rst_ni || buf_rst_i)
             head <= '0;
         else
             if (can_receive)
@@ -71,7 +72,7 @@ module RingBuffer
 
     /* Tail control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni)
+        if (!rst_ni || buf_rst_i)
             tail <= '0;
         else
             if (can_send)
@@ -81,7 +82,7 @@ module RingBuffer
     /* Input control: sets full when next_head == tail on an insertion */
     /* Output control: sets empty when next_tail == head on a removal */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni) begin
+        if (!rst_ni || buf_rst_i) begin
             full  <= 1'b0;
             empty <= 1'b1;
         end
