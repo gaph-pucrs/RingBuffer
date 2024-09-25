@@ -64,42 +64,56 @@ module RingBuffer
 
     /* Head control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni || buf_rst_i)
+        if (!rst_ni) begin
             head <= '0;
-        else
-            if (can_receive)
+        end
+        else begin
+            if (buf_rst_i)
+                head <= '0;
+            else if (can_receive)
                 head <= next_head;
+        end
     end
 
     /* Tail control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni || buf_rst_i)
+        if (!rst_ni) begin
             tail <= '0;
-        else
-            if (can_send)
+        end
+        else begin
+            if (buf_rst_i)
+                tail <= '0;
+            else if (can_send)
                 tail <= next_tail;
+        end
     end
 
     /* Input control: sets full when next_head == tail on an insertion */
     /* Output control: sets empty when next_tail == head on a removal */
     always_ff @(posedge clk_i or negedge rst_ni) begin
-        if (!rst_ni || buf_rst_i) begin
+        if (!rst_ni) begin
             full  <= 1'b0;
             empty <= 1'b1;
         end
         else begin
-            if (can_receive) begin
-                if (!can_send)
-                    full <= next_head == tail;
-
-                empty <= 1'b0;
+            if (buf_rst_i) begin
+                full  <= 1'b0;
+                empty <= 1'b1;
             end
+            else begin
+                if (can_receive) begin
+                    if (!can_send)
+                        full <= next_head == tail;
 
-            if (can_send) begin
-                if (!can_receive)
-                    empty <= next_tail == head;
+                    empty <= 1'b0;
+                end
 
-                full <= 1'b0;
+                if (can_send) begin
+                    if (!can_receive)
+                        empty <= next_tail == head;
+
+                    full <= 1'b0;
+                end
             end
         end
     end
