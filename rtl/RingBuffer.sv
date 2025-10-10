@@ -14,7 +14,9 @@
 module RingBuffer
 #(
     parameter DATA_SIZE = 32,
-    parameter BUFFER_SIZE = 8   /* Power of 2 */
+    parameter BUFFER_SIZE = 8,            /* Power of 2 */
+    parameter ALMOST_FULL_THRESHOLD  = 1, /* 0 for disabled */
+    parameter ALMOST_EMPTY_THRESHOLD = 1  /* 0 for disabled */
 )
 (
     input  logic                     clk_i,
@@ -27,19 +29,25 @@ module RingBuffer
 
     output logic                     tx_o,
     input  logic                     tx_ack_i,
-    output logic [(DATA_SIZE - 1):0] data_o
+    output logic [(DATA_SIZE - 1):0] data_o,
+
+    output logic                     almost_full_o,
+    output logic                     almost_empty_o
 );
+
+    typedef logic [($clog2(BUFFER_SIZE + 1) - 1):0] buf_cnt_t;
+    typedef logic [($clog2(BUFFER_SIZE) - 1):0]     buf_ptr_t; 
 
     logic full;
     logic empty;
 
-    logic [($clog2(BUFFER_SIZE) - 1):0] head;
-    logic [($clog2(BUFFER_SIZE) - 1):0] tail;
+    buf_ptr_t head;
+    buf_ptr_t tail;
 
-    logic [($clog2(BUFFER_SIZE) - 1):0] next_head;
-    logic [($clog2(BUFFER_SIZE) - 1):0] next_tail;
+    buf_ptr_t next_head;
+    buf_ptr_t next_tail;
 
-    logic [(DATA_SIZE - 1):0]           buffer [(BUFFER_SIZE - 1):0];
+    logic [(DATA_SIZE - 1):0] buffer [(BUFFER_SIZE - 1):0];
 
     assign rx_ack_o = !full;
     assign tx_o     = !empty;
@@ -116,6 +124,45 @@ module RingBuffer
                 end
             end
         end
+    end
+    
+    if (ALMOST_FULL_THRESHOLD > 0 || ALMOST_EMPTY_THRESHOLD > 0) begin : gen_entry_count_on
+        buf_cnt_t entry_count;
+        always_ff @(posedge clk_i or negedge rst_ni) begin
+            if (!rst_ni) begin
+                entry_count <= '0;
+            end
+            else begin
+                if (buf_rst_i) begin
+                    entry_count <= '0;
+                end
+                else begin
+                    case ({can_receive, can_send})
+                        2'b01: entry_count <= entry_count - 1'b1;
+                        2'b10: entry_count <= entry_count + 1'b1;
+                        default: ;
+                    endcase
+                end
+            end
+        end
+
+        if (ALMOST_FULL_THRESHOLD > 0) begin : gen_almost_full_on
+            assign almost_full_o = (entry_count >= buf_cnt_t'(BUFFER_SIZE - ALMOST_FULL_THRESHOLD));
+        end
+        else begin : gen_almost_full_off
+            assign almost_full_o = 1'b0;
+        end
+
+        if (ALMOST_EMPTY_THRESHOLD > 0) begin : gen_almost_empty_on
+            assign almost_empty_o = (entry_count <= buf_cnt_t'(ALMOST_EMPTY_THRESHOLD));
+        end
+        else begin : gen_almost_empty_off
+            assign almost_empty_o = 1'b0;
+        end
+    end
+    else begin : gen_entry_count_off
+        assign almost_full_o  = 1'b0;
+        assign almost_empty_o = 1'b0;
     end
 
 endmodule
