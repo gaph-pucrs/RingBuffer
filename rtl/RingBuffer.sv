@@ -35,8 +35,8 @@ module RingBuffer
     output logic                     almost_empty_o
 );
 
-    typedef logic [($clog2(BUFFER_SIZE + 1) - 1):0] buf_cnt_t;
-    typedef logic [($clog2(BUFFER_SIZE) - 1):0]     buf_ptr_t; 
+    typedef logic [($clog2(BUFFER_SIZE + 1) - 1):0]                     buf_cnt_t;
+    typedef logic [((BUFFER_SIZE > 1 ? $clog2(BUFFER_SIZE) : 1) - 1):0] buf_ptr_t; 
 
     logic full;
     logic empty;
@@ -53,8 +53,8 @@ module RingBuffer
     assign tx_o     = !empty;
     assign data_o   = buffer[tail];
 
-    assign next_head = head + 1'b1;
-    assign next_tail = tail + 1'b1;
+    assign next_head = (BUFFER_SIZE > 1 ? (head + 1'b1) : '0);
+    assign next_tail = (BUFFER_SIZE > 1 ? (tail + 1'b1) : '0);
 
     logic can_receive;
     assign can_receive = rx_i && !full;
@@ -147,14 +147,18 @@ module RingBuffer
         end
 
         if (ALMOST_FULL_THRESHOLD > 0) begin : gen_almost_full_on
+            /* verilator lint_off UNSIGNED */
             assign almost_full_o = (entry_count >= buf_cnt_t'(BUFFER_SIZE - ALMOST_FULL_THRESHOLD));
+            /* verilator lint_on UNSIGNED */
         end
         else begin : gen_almost_full_off
             assign almost_full_o = 1'b0;
         end
 
         if (ALMOST_EMPTY_THRESHOLD > 0) begin : gen_almost_empty_on
+            /* verilator lint_off CMPCONST */
             assign almost_empty_o = (entry_count <= buf_cnt_t'(ALMOST_EMPTY_THRESHOLD));
+            /* verilator lint_on CMPCONST */
         end
         else begin : gen_almost_empty_off
             assign almost_empty_o = 1'b0;
