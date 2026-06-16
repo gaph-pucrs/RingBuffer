@@ -13,10 +13,11 @@
 
 module RingBuffer
 #(
-    parameter DATA_SIZE = 32,
-    parameter BUFFER_SIZE = 8,            /* Power of 2 */
-    parameter ALMOST_FULL_THRESHOLD  = 1, /* 0 for disabled */
-    parameter ALMOST_EMPTY_THRESHOLD = 1  /* 0 for disabled */
+    parameter DATA_SIZE               = 32,
+    parameter BUFFER_SIZE             = 8,  /* Power of 2 */
+    parameter FIRST_WORD_FALL_THROUGH = 0,  /* 0 for disabled */
+    parameter ALMOST_FULL_THRESHOLD   = 1,  /* 0 for disabled */
+    parameter ALMOST_EMPTY_THRESHOLD  = 1   /* 0 for disabled */
 )
 (
     input  logic                     clk_i,
@@ -49,9 +50,15 @@ module RingBuffer
 
     logic [(DATA_SIZE - 1):0] buffer [(BUFFER_SIZE - 1):0];
 
+    logic fwft_active;
+    assign fwft_active = FIRST_WORD_FALL_THROUGH && empty && rx_i;
+
+    logic fwft_bypass_consumed;
+    assign fwft_bypass_consumed = fwft_active && tx_ack_i;
+
     assign rx_ack_o = !full;
-    assign tx_o     = !empty;
-    assign data_o   = buffer[tail];
+    assign tx_o     = !empty || fwft_active;
+    assign data_o   = fwft_active ? data_i : buffer[tail];
 
     assign next_head = (BUFFER_SIZE > 1 ? (head + 1'b1) : '0);
     assign next_tail = (BUFFER_SIZE > 1 ? (tail + 1'b1) : '0);
@@ -60,7 +67,7 @@ module RingBuffer
     assign can_receive = rx_i && !full;
 
     logic can_send;
-    assign can_send = tx_ack_i && !empty;
+    assign can_send = tx_ack_i && tx_o;
 
     /* Buffer write control */
     always_ff @(posedge clk_i or negedge rst_ni) begin
@@ -113,7 +120,8 @@ module RingBuffer
                     if (!can_send)
                         full <= next_head == tail;
 
-                    empty <= 1'b0;
+                    if (!fwft_bypass_consumed)
+                        empty <= 1'b0;
                 end
 
                 if (can_send) begin
