@@ -32,6 +32,7 @@ module RingBuffer
     input  logic                     tx_ack_i,
     output logic [(DATA_SIZE - 1):0] data_o,
 
+    output logic [$clog2(BUFFER_SIZE + 1) - 1:0] count_o,
     output logic                     almost_full_o,
     output logic                     almost_empty_o
 );
@@ -134,46 +135,42 @@ module RingBuffer
         end
     end
     
-    if (ALMOST_FULL_THRESHOLD > 0 || ALMOST_EMPTY_THRESHOLD > 0) begin : gen_entry_count_on
-        buf_cnt_t entry_count;
-        always_ff @(posedge clk_i or negedge rst_ni) begin
-            if (!rst_ni) begin
+    buf_cnt_t entry_count;
+    always_ff @(posedge clk_i or negedge rst_ni) begin
+        if (!rst_ni) begin
+            entry_count <= '0;
+        end
+        else begin
+            if (buf_rst_i) begin
                 entry_count <= '0;
             end
             else begin
-                if (buf_rst_i) begin
-                    entry_count <= '0;
-                end
-                else begin
-                    case ({can_receive, can_send})
-                        2'b01: entry_count <= entry_count - 1'b1;
-                        2'b10: entry_count <= entry_count + 1'b1;
-                        default: ;
-                    endcase
-                end
+                case ({can_receive, can_send})
+                    2'b01: entry_count <= entry_count - 1'b1;
+                    2'b10: entry_count <= entry_count + 1'b1;
+                    default: ;
+                endcase
             end
         end
-
-        if (ALMOST_FULL_THRESHOLD > 0) begin : gen_almost_full_on
-            /* verilator lint_off UNSIGNED */
-            assign almost_full_o = (entry_count >= buf_cnt_t'(BUFFER_SIZE - ALMOST_FULL_THRESHOLD));
-            /* verilator lint_on UNSIGNED */
-        end
-        else begin : gen_almost_full_off
-            assign almost_full_o = 1'b0;
-        end
-
-        if (ALMOST_EMPTY_THRESHOLD > 0) begin : gen_almost_empty_on
-            /* verilator lint_off CMPCONST */
-            assign almost_empty_o = (entry_count <= buf_cnt_t'(ALMOST_EMPTY_THRESHOLD));
-            /* verilator lint_on CMPCONST */
-        end
-        else begin : gen_almost_empty_off
-            assign almost_empty_o = 1'b0;
-        end
     end
-    else begin : gen_entry_count_off
-        assign almost_full_o  = 1'b0;
+
+    assign count_o = entry_count;
+
+    if (ALMOST_FULL_THRESHOLD > 0) begin : gen_almost_full_on
+        /* verilator lint_off UNSIGNED */
+        assign almost_full_o = (entry_count >= buf_cnt_t'(BUFFER_SIZE - ALMOST_FULL_THRESHOLD));
+        /* verilator lint_on UNSIGNED */
+    end
+    else begin : gen_almost_full_off
+        assign almost_full_o = 1'b0;
+    end
+
+    if (ALMOST_EMPTY_THRESHOLD > 0) begin : gen_almost_empty_on
+        /* verilator lint_off CMPCONST */
+        assign almost_empty_o = (entry_count <= buf_cnt_t'(ALMOST_EMPTY_THRESHOLD));
+        /* verilator lint_on CMPCONST */
+    end
+    else begin : gen_almost_empty_off
         assign almost_empty_o = 1'b0;
     end
 
